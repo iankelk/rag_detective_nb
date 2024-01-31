@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 import os
 from typing import Dict, List
-from api import helper, dummy
+from api import config, helper, dummy
 from typing import List
 import asyncio 
 from asyncio import Lock
@@ -101,9 +101,6 @@ class QueryStorage:
 # Set the OpenAI key as an Environment Variable (the different underscore notation is weaviate vs llamaindex)
 os.environ["OPENAI_API_KEY"] = os.environ.get('OPENAI_APIKEY')
 
-# Current Weaviate IP
-WEAVIATE_IP_ADDRESS = "34.42.138.162"
-
 # Setup FastAPI app
 app = FastAPI(title="API Server", description="API Server", version="v1")
 
@@ -125,7 +122,7 @@ async def startup_event():
     and configurations for the Weaviate client and also initializes the classes for managing financial status
     and URL storage.
     
-    The Weaviate client is created using the IP address specified by the WEAVIATE_IP_ADDRESS environment variable
+    The Weaviate client is created using the IP address specified by config.WEAVIATE_IP_ADDRESS 
     and is stored in the application state for accessibility throughout the application lifecycle.
     
     Two instances of custom classes, QueryStorage and FinancialStatus, are also created and stored in the application's
@@ -133,14 +130,14 @@ async def startup_event():
     encapsulation of functionality across API endpoints.
 
     Note:
-    - The WEAVIATE_IP_ADDRESS environment variable must be set prior to starting the application.
+    - config.WEAVIATE_IP_ADDRESS must be set.
     - QueryStorage encapsulates the storage and retrieval of query-related information.
     - FinancialStatus encapsulates the checking and setting of the financial status associated with query processing.
 
     Example usage:
     This function is not meant to be triggered manually; it is an event handler for application startup.
     """
-    app.state.weaviate_client = weaviate.Client(url=f"http://{WEAVIATE_IP_ADDRESS}:8080")
+    app.state.weaviate_client = weaviate.Client(url=f"http://{config.WEAVIATE_IP_ADDRESS}:{config.WEAVIATE_PORT}")
     app.state.query_storage = QueryStorage()
     app.state.financial_status = FinancialStatus()
 

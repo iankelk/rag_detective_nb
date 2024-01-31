@@ -21,7 +21,7 @@ from pathlib import Path
 from google.cloud import storage
 import re
 import fitz  # PyMuPDF
-
+from api import config
 
 def query_weaviate(client, website, timestamp, query):
     """
@@ -242,8 +242,8 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 }
 
-#google cloud bucket name where csv's for company data are stored
-bucket_name = "ac215_scraper_bucket"
+# Use the constant from config.py
+bucket_name = config.GCP_BUCKET_NAME
 
 def set_chrome_options() -> ChromiumOptions:
     """Sets chrome options for Selenium.Chrome options for headless browser is enabled.
@@ -539,7 +539,7 @@ def download_blob_from_gcloud(filename):
 
 
 # Write to weaviate part
-def store_to_weaviate(filename):
+def store_to_weaviate(client, filename):
     """
     Stores documents into a Weaviate vector store and yields progress updates.
 
@@ -555,26 +555,9 @@ def store_to_weaviate(filename):
 
     Raises:
        Exception: Catches any exceptions that occur during the process and prints an error message.
-
-    Note:
-       The function expects the Weaviate instance to be accessible at the given IP address and the
-       OpenAI API key to be set as an environment variable.
     """
-    success = False
-
-    # Retrieve the OpenAI API key from the environment variables
-    OPENAI_APIKEY = os.getenv("OPENAI_APIKEY")
-    print(OPENAI_APIKEY)
-
-    # Set the OpenAI key as an Environment Variable (for when it's run on GCS)
-    os.environ["OPENAI_APIKEY"] = OPENAI_APIKEY
-    print("Ending at OPENAI key part")
-    # Current Weaviate IP
-    WEAVIATE_IP_ADDRESS = "34.42.138.162"
-
     print("Starting to insert into Weaviate")
     try:
-        client = weaviate.Client(url="http://" + WEAVIATE_IP_ADDRESS + ":8080")
         websiteAddress, timestamp = filename.rsplit('.', 1)[0].split('_')
         print(websiteAddress, timestamp)
         file_loc = f"/home/downloads/{filename}"
