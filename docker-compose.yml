@@ -11,8 +11,8 @@ services:
     - http
     image: semitechnologies/weaviate:1.23.7
     ports:
-    - 8081:8080
-    - 50052:50051
+    - 8080:8080
+    - 50051:50051
     volumes:
     - weaviate_data:/var/lib/weaviate
     restart: on-failure:0
