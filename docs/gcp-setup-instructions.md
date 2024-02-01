@@ -183,7 +183,7 @@ Obviously this is a temporary measure just as we build the application, and we w
 
 ![](../img/firewall-rule.jpg)
 
-For example, at one point our instance's external URL was `34.31.93.155`, so accessing port `8080` for Weaviate at `https://34.31.93.155:8080/` gave the response:
+For example, at one point our instance's external URL was `34.31.93.155`, so accessing port `8080` for Weaviate at `http://34.31.93.155:8080/` gave the response:
 
 ```json
 {
