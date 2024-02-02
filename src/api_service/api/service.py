@@ -177,7 +177,7 @@ async def streaming_endpoint():
         StreamingResponse: An ongoing streaming response of data points, sent one by one.
 
     Example:
-        curl http://localhost:9000/streaming
+        curl -N http://localhost:9000/streaming
 
     """
     async def event_generator():
@@ -626,7 +626,7 @@ async def scrape_sitemap(request: Request):
                     yield f"Chunking and preparing documents to insert into vector store.\n"
 
                     # Store to Weaviate and yield progress updates
-                    for update in helper.store_to_weaviate(output_file):
+                    for update in helper.store_to_weaviate(app.state.weaviate_client, output_file):
                         yield update
 
                 else:
