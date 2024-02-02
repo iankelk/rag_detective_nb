@@ -41,8 +41,7 @@ def query_weaviate(client, website, timestamp, query):
         A streaming response object containing the results of the executed query.
 
     Note:
-        The function measures the execution time of the query and prints it. The prompt template includes
-        a specific format for handling financial information in the query response.
+        The function measures the execution time of the query and prints it.
     """
 
     # construct vector store
@@ -65,17 +64,7 @@ def query_weaviate(client, website, timestamp, query):
     # Custom prompt to exclude out of context answers
     template = ("We have provided context information below. If the answer to a query is not contained in this context, "
                 "please explain that the context does not include the information. If the information IS included in the context, "
-                "please answer the question using the context provided below. If the answer is "
-                "financial in nature then please append QQ to the end of the response."
-                "Here are some examples: "
-                "The location of this company is not provided in the given context.\n"
-                "The company's profits were very high that year. QQ \n"
-                "The CEO's salary was $14 million. QQ \n"
-                "The company has made money for it's clients. QQ \n"
-                "The company is located in Grand Rapids, Michigan.\n"
-                "A language model is a type of machine learning model.\n"
-                "James founded the company in 2015.\n"
-                "James founded the company in 2015 with an initial seed round of $15 million. QQ \n"
+                "please answer the question using the context provided."
                 "\n---------------------\n"
                 "{context_str}"
                 "\n---------------------\n"

@@ -20,36 +20,6 @@ from google.oauth2 import service_account
 import warnings
 warnings.simplefilter(action='ignore', category=Warning)
 
-class FinancialStatus:
-    """
-    A class to encapsulate and manage the financial status.
-
-    Attributes:
-        _is_financial (bool): A flag indicating whether the financial status is set.
-    """
-
-    def __init__(self):
-        """Initializes the financial status to False by default."""
-        self._is_financial = False
-
-    def set_financial(self, status: bool):
-        """
-        Sets the financial status flag.
-        
-        Args:
-            status (bool): The new status to be set, indicating whether the context is financial.
-        """
-        self._is_financial = status
-
-    def is_financial(self) -> bool:
-        """
-        Checks if the current status is financial.
-
-        Returns:
-            bool: The current value of the financial status flag.
-        """
-        return self._is_financial
-
 class QueryStorage:
     """
     A class for storing and retrieving queries in a thread-safe manner.
@@ -64,35 +34,37 @@ class QueryStorage:
         self._storage = {}
         self._lock = Lock()
 
-    async def store_query(self, query_id: str, financial: bool, urls: List[str]):
+    async def store_query(self, query_id: str, urls: List[str]) -> None:
         """
-        Stores a query with its associated financial status and URLs in the storage.
+        Stores a query with its associated URLs in the storage.
 
         This method is thread-safe and uses an asyncio lock to protect the access to the storage.
-        
+
         Args:
             query_id (str): The unique identifier for the query.
-            financial (bool): The financial status associated with the query.
             urls (List[str]): A list of URLs associated with the query.
+
+        Returns:
+            None
         """
         async with self._lock:
-            self._storage[query_id] = (financial, urls)
+            self._storage[query_id] = urls
 
-    async def retrieve_query(self, query_id: str) -> tuple:
+    async def retrieve_query(self, query_id: str) -> List[str]:
         """
         Retrieves and deletes a query from the storage.
 
         This method safely pops the query information based on the query ID, if it exists,
-        and returns the financial status and associated URLs. Otherwise, returns (None, None).
+        and returns the associated URLs. Otherwise, returns an empty list.
         
         Args:
             query_id (str): The unique identifier for the query to be retrieved.
         
         Returns:
-            tuple: A tuple containing the financial status and list of URLs for the query, or (None, None) if not found.
+            List[str]: A list of URLs for the query, or an empty list if not found.
         """
         async with self._lock:
-            return self._storage.pop(query_id, (None, None))
+            return self._storage.pop(query_id, [])
 
 
 # Test using this line of curl:
@@ -119,28 +91,24 @@ async def startup_event():
     Initializes application components and stores them in the application state at startup.
 
     This function is executed automatically when the FastAPI application starts. It establishes connections
-    and configurations for the Weaviate client and also initializes the classes for managing financial status
-    and URL storage.
+    and configurations for the Weaviate client and also initializes the classes for managing URL storage.
     
     The Weaviate client is created using the IP address specified by config.WEAVIATE_IP_ADDRESS 
     and is stored in the application state for accessibility throughout the application lifecycle.
     
-    Two instances of custom classes, QueryStorage and FinancialStatus, are also created and stored in the application's
-    state. These instances handle financial flag status checks and URL storage management, respectively, enabling thread-safe
+    A custom classes, QueryStorage, is also created and stored in the application's
+    state. This instance handles URL storage management, enabling thread-safe
     encapsulation of functionality across API endpoints.
 
     Note:
     - config.WEAVIATE_IP_ADDRESS must be set.
     - QueryStorage encapsulates the storage and retrieval of query-related information.
-    - FinancialStatus encapsulates the checking and setting of the financial status associated with query processing.
 
     Example usage:
     This function is not meant to be triggered manually; it is an event handler for application startup.
     """
     app.state.weaviate_client = weaviate.Client(url=f"http://{config.WEAVIATE_IP_ADDRESS}:{config.WEAVIATE_PORT}")
     app.state.query_storage = QueryStorage()
-    app.state.financial_status = FinancialStatus()
-
 
 # Routes
 @app.get("/")
@@ -186,29 +154,19 @@ async def streaming_endpoint():
             await asyncio.sleep(0.1)
     return StreamingResponse(event_generator(), media_type="text/plain")
 
-async def process_streaming_response(local_streaming_response, financial_status: FinancialStatus):
+async def process_streaming_response(local_streaming_response):
     """
-    Processes streaming response from a local source, checks for financial markers, 
-    and yields processed text segments.
+    Processes streaming response from a local source and yields processed text segments.
 
-    This asynchronous function iterates over a generator of streaming responses,
-    examining each text segment for a specific marker ("QQ"). "QQ" was chosen since for
-    reasons only known to itself, GPT-3.5 seems to struggle with more complex flags.
-    If such a marker is found, it indicates a financial context and the financial status 
-    is set to True using the financial_status instance provided. The marker is then removed
-    from the text.
-
-    The function yields each processed text segment. It handles `asyncio.CancelledError` to
+    This asynchronous function iterates over a generator of streaming responses. The function yields each processed text segment. It handles `asyncio.CancelledError` to
     gracefully manage the cancellation of the streaming.
 
     Args:
         local_streaming_response: An instance of a streaming response object with a 'response_gen'
                                   generator attribute, which is a generator yielding text segments.
-        financial_status (FinancialStatus): An instance of FinancialStatus to manage the financial
-                                            status throughout the processing.
 
     Yields:
-        str: Processed text segments without the financial marker.
+        str: Processed text segments.
     
     Raises:
         asyncio.CancelledError: If the streaming process is cancelled. This is caught and handled 
@@ -216,15 +174,9 @@ async def process_streaming_response(local_streaming_response, financial_status:
     """
     try:
         for text in local_streaming_response.response_gen:
-            # Check for the financial flag at the end of the text
-            if "QQ" in text:
-                financial_status.set_financial(True)
-                text = text.replace("QQ", "")  # remove the "%%"
             if text:   # Check for null character or empty string
                 print(f"Yielding: [{text}]")
                 yield text  
-        if financial_status.is_financial():
-            print(" Financial flag set!", flush=True)
     except asyncio.CancelledError as e:
         print('Streaming cancelled', flush=True)
 
@@ -272,7 +224,6 @@ async def rag_query(request: Request, background_tasks: BackgroundTasks):
         HTTPException: If any required fields are missing in the request.
 
     Note:
-        The endpoint interacts with the `financial_status` instance during URL processing to manage the financial flag.
         The response includes a custom 'X-Query-ID' header to track the query ID for reference retrieval.
 
     Example usage:
@@ -296,10 +247,8 @@ async def rag_query(request: Request, background_tasks: BackgroundTasks):
     # Query Weaviate
     streaming_response = helper.query_weaviate(app.state.weaviate_client, website, timestamp, query)
 
-    financial_status_instance = request.app.state.financial_status
-
     # Add the URL processing function as a background task
-    background_tasks.add_task(process_url_extraction, query_id, streaming_response, financial_status_instance, request.app.state.query_storage)
+    background_tasks.add_task(process_url_extraction, query_id, streaming_response, request.app.state.query_storage)
 
     # Generate the streaming response and return it
     headers = {
@@ -309,30 +258,28 @@ async def rag_query(request: Request, background_tasks: BackgroundTasks):
     }
 
     return StreamingResponse(
-        process_streaming_response(streaming_response, financial_status_instance),
+        process_streaming_response(streaming_response),
         media_type="text/plain",
         headers=headers
     )
 
-async def process_url_extraction(query_id: str, streaming_response, financial_status: FinancialStatus, query_storage: QueryStorage):
+async def process_url_extraction(query_id: str, streaming_response, query_storage: QueryStorage):
     """
     Processes the given streaming response to extract and store unique URLs.
 
     This asynchronous function takes a streaming response, extracts URLs from the
     documents in the stream, and uses the `query_storage` instance to store them. It ensures
-    that the URLs are unique and maintains their order. The extracted URLs, along with the financial
-    status, are associated with the provided `query_id`.
+    that the URLs are unique and maintains their order. The extracted URLs are associated with
+    the provided `query_id`.
 
     Args:
         query_id (str): The unique identifier for the query.
         streaming_response: The streaming response object to process.
-        financial_status (FinancialStatus): An instance representing the financial status checker.
         query_storage (QueryStorage): An instance for managing query-related URL storage.
 
     Note:
         URLs extraction and storage are managed by a `query_storage` instance which employs an asynchronous
-        lock to ensure thread-safe operations. The storage format for each query is a tuple
-        of the financial flag and the list of unique URLs.
+        lock to ensure thread-safe operations. The storage format for each query is a list of unique URLs.
     """
     extracted_urls = helper.extract_document_urls(streaming_response)
     unique_urls = []
@@ -342,7 +289,7 @@ async def process_url_extraction(query_id: str, streaming_response, financial_st
             unique_urls.append(url)
     
     # Use the provided instance to store the ordered, unique URLs
-    await query_storage.store_query(query_id, financial_status.is_financial(), unique_urls)
+    await query_storage.store_query(query_id, unique_urls)
 
 @app.get("/websites", response_model=List[str])
 def read_websites():
@@ -392,10 +339,10 @@ def read_timestamps(website_address: str):
 @app.get("/get_urls/{query_id}")
 async def get_urls(request: Request, query_id: str):
     """
-    Retrieves the URLs and financial flag associated with the provided query ID.
+    Retrieves the URLs associated with the provided query ID.
 
     This asynchronous endpoint takes a query ID as a path parameter, looks up the associated
-    URLs and financial flag within the application's query storage, and returns them. If the URLs 
+    URLs within the application's query storage, and returns them. If the URLs 
     are not available or the query ID is invalid, it responds with an error message and a 404 status code. 
     The URLs and flag are deleted from storage after retrieval to maintain simplicity.
 
@@ -404,7 +351,7 @@ async def get_urls(request: Request, query_id: str):
         query_id (str): The unique identifier for the query.
 
     Returns:
-        JSONResponse: A response object containing the URLs and financial flag if available,
+        JSONResponse: A response object containing the URLs if available,
                       or an error message with a 404 status code if not.
 
     Raises:
@@ -417,79 +364,12 @@ async def get_urls(request: Request, query_id: str):
     Example usage:
         curl http://localhost:9000/get_urls/{query_id}
     """
-    financial_flag, urls = await request.app.state.query_storage.retrieve_query(query_id)
+    urls = await request.app.state.query_storage.retrieve_query(query_id)
     if urls is None:
         # Correctly format the response with a custom status code
         return JSONResponse(content={"error": "URLs not available yet or invalid query ID"}, status_code=404)
 
-    return {"urls": urls, "financial_flag": financial_flag}
-
-
-
-
-@app.post("/vertexai_predict")
-async def vertexai_predict(request: Request):
-    """
-    Performs sentiment analysis using Google Cloud's Vertex AI based on the provided text.
-
-    This endpoint accepts a request containing text data and sends it to a pre-configured Vertex AI endpoint
-    for sentiment analysis. It requires authentication with Google Cloud using a service account. The response
-    from Vertex AI, including the sentiment and probabilities, is parsed and returned in a structured format.
-
-    Args:
-       request (Request): The incoming HTTP request containing the text data for prediction.
-
-    Returns:
-       dict: A dictionary containing the sentiment analysis results, including sentiment value and probabilities.
-
-    Raises:
-       HTTPException: If authentication with Google Cloud fails or other request-related issues occur.
-
-    Note:
-       The Vertex AI endpoint ID, project ID, and the location of the service account key are hard-coded in this
-       function. Ensure these values are correctly set before deployment.
-
-    Example usage:
-       curl -N -H "Content-Type: application/json" -d "{\"text\": \"Turnover surged to EUR61 .8 m from EUR47 .6 m due to increasing service demand , especially in the third quarter , and the overall growth of its business .\"}" "http://localhost:9000/vertexai_predict"
-       """
-    ENDPOINT_ID = "7054451210648027136"
-    PROJECT_ID = "rag-detective"
-    SERVICE_ACCOUNT_FILE = './secrets/ml-workflow.json'
-
-    # Load data received from your HTML file's JavaScript fetch function
-    data = await request.json()
-    text = data.get('text')
-
-    # Before sending to the AI Platform Prediction, convert to needed format
-    instances = [text]  # this is now a list with a single string
-
-    # Location of your service account key json file
-
-    # Authenticate and create the AI Platform (Unified) client
-    try:
-        # Load credentials from the service account file
-        credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
-        aiplatform.init(credentials=credentials)
-    except exceptions.DefaultCredentialsError:
-        return {"error": "Couldn't authenticate with Google Cloud."}
-
-    endpoint = f'projects/{PROJECT_ID}/locations/us-central1/endpoints/{ENDPOINT_ID}'
-    response = aiplatform.Endpoint(endpoint).predict(instances=instances)
-
-    # Extract the sentiment and probabilities from the predictions
-    sentiment, probabilities = response.predictions
-
-    # Convert the sentiment to an integer
-    sentiment_value = int(sentiment[0])
-    probabilities_value = probabilities[0]
-
-    # Construct the response structure
-    response_structure = {
-        "sentiment": sentiment_value,
-        "probabilities": probabilities_value
-    }
-
-    return response_structure
+    return {"urls": urls}
 
 # Scraper Endpoints
 
