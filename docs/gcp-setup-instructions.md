@@ -144,7 +144,7 @@ This is done using this [guide on GitHub docs.](https://docs.github.com/en/authe
 Once you have created a token, save it somewhere safe and private, as it will not display again. Using the fictional token `abcdefghijklmnopqrstuvwxyz123456789`, this is how you would then clone the repo:
 
 ```sh
-git clone -b milestone2 https://abcdefghijklmnopqrstuvwxyz123456789@github.com/healthy-chicken-saladeers/ac215_healthychickensaladeers.git
+git clone -b main https://abcdefghijklmnopqrstuvwxyz123456789@github.com/iankelk/rag_detective_nb.git
 ```
 
 This will create the `ac215_healthychickensaladeers` folder.

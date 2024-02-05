@@ -1,8 +1,9 @@
 import weaviate
 from datetime import datetime, timezone
 from llama_index import Document
+from llama_index.llms import OpenAI
 from llama_index.vector_stores import WeaviateVectorStore
-from llama_index import VectorStoreIndex, StorageContext
+from llama_index import VectorStoreIndex, StorageContext, ServiceContext
 from llama_index.storage.storage_context import StorageContext
 from llama_index.vector_stores.types import ExactMatchFilter, MetadataFilters
 from llama_index.prompts import PromptTemplate
@@ -44,6 +45,9 @@ def query_weaviate(client, website, timestamp, query):
         The function measures the execution time of the query and prints it.
     """
 
+    llm = OpenAI(temperature=0.1, model="gpt-4-1106-preview ")
+    service_context = ServiceContext.from_defaults(llm=llm)
+
     # construct vector store
     vector_store = WeaviateVectorStore(weaviate_client=client, index_name="Pages", text_key="text")
 
@@ -51,7 +55,9 @@ def query_weaviate(client, website, timestamp, query):
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     # setup an index for the Vector Store
-    index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+    index = VectorStoreIndex.from_vector_store(vector_store,
+                                               storage_context=storage_context,
+                                               service_context=service_context)
 
     # Create exact match filters for websiteAddress
     # value = website
