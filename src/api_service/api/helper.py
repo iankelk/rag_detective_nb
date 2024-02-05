@@ -45,7 +45,7 @@ def query_weaviate(client, website, timestamp, query):
         The function measures the execution time of the query and prints it.
     """
 
-    llm = OpenAI(temperature=0.1, model="gpt-4-1106-preview ")
+    llm = OpenAI(temperature=0.1, model="gpt-4-1106-preview")
     service_context = ServiceContext.from_defaults(llm=llm)
 
     # construct vector store
