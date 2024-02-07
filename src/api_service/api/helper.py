@@ -70,7 +70,8 @@ def query_weaviate(client, website, timestamp, query):
     # Custom prompt to exclude out of context answers
     template = ("We have provided context information below. If the answer to a query is not contained in this context, "
                 "please explain that the context does not include the information. If the information IS included in the context, "
-                "please answer the question using the context provided."
+                "please answer the question using the context provided. However, do not refer to the context specifically by "
+                "saying something like 'According to the context'."
                 "\n---------------------\n"
                 "{context_str}"
                 "\n---------------------\n"
